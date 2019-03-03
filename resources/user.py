@@ -1,5 +1,6 @@
 from flask_restful import Resource, reqparse
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import create_access_token, create_refresh_token
 
 from models.user import UserModel
 
@@ -41,7 +42,14 @@ class LoginUser(Resource):
         user =  UserModel.find_by_username(data['username'])
     
         if user and  check_password_hash(user.password, data['password']):
-            return {'message':'user logged in'}
+            access_token = create_access_token(identity=user.id, fresh=True)
+            refresh_token = create_refresh_token(user.id)
+            return {
+                'access token': access_token,
+                'refresh token': refresh_token
+            }, 200
+        
+        return{'message': 'Invalid credentials'}, 401
 
 
     
