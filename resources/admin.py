@@ -1,5 +1,5 @@
 from flask_restful import Resource, reqparse
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, fresh_jwt_required
 from werkzeug.security import  generate_password_hash
 
 from models.user import UserModel
@@ -11,11 +11,8 @@ _user_parser.add_argument('username',
                         required=True,
                         help="This field cannot be blank."
                         )
-_user_parser.add_argument('password',
-                        type=str,
-                        required=True,
-                        help="This field cannot be blank."
-                        )
+
+
 
 class Users(Resource):
     @jwt_required
@@ -32,33 +29,8 @@ class Users(Resource):
                     }
         
         return {'message': 'user not found'}, 404
-
-    @jwt_required
-    def post(self, username):
-        user_id = get_jwt_identity()
-        current_user = UserModel.find_by_id(user_id)
-
-        if not current_user.admin:
-            return {'message':'unauthorised user'}, 401
-
-        data = _user_parser.parse_args()
-        user =  UserModel.find_by_username(data['username'])
-        if user:
-            return {'message':'user already exits'}
-        
-        hashed_password = generate_password_hash(data['password'], method='sha256')
-        user = UserModel(data['username'], hashed_password)
-        
-        try:
-            user.save_to_db()
-        except:
-            return {'message':'unable to create user'}, 500
-
-        #return {'message':'user successfuly created'}, 201
-        return {'username': data['username'],
-                'password': hashed_password}, 201
     
-    @jwt_required
+    @fresh_jwt_required
     def delete(self, username):
         user_id = get_jwt_identity()
         current_user = UserModel.find_by_id(user_id)
@@ -74,19 +46,26 @@ class Users(Resource):
         return {'message':'unable to delete user'}, 500
     
 class PromoteUser(Resource):
-    @jwt_required
-    def put(self, username):
+    @fresh_jwt_required
+    def put(self):
+        _user_parser.add_argument('id',
+                                   type=str,
+                                   required=True,
+                                   help="This field cannot be blank."
+                                )
+
         user_id = get_jwt_identity()
         current_user = UserModel.find_by_id(user_id)
 
         if not current_user.admin:
             return {'message':'unauthorised user'}, 401
 
-        user = UserModel.find_by_username(username)
+        data = _user_parser.parse_args()
+        user = UserModel.find_by_username(data['username'])
         if user:
             user.admin = True
             user.save_to_db()
-            return {'message':'you have been promoted to an admin'}
+            return {'message':'the user has been promoted to an admin'}
 
 class UserList(Resource):
     @jwt_required
@@ -100,6 +79,3 @@ class UserList(Resource):
         return {'users': [x.json() for x in UserModel.find_all()]}
 
         
-
-
-
